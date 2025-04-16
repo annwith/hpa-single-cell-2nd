@@ -16,7 +16,7 @@ def basic_predict(mdl, dl, cfg, tune=None):
     print("[ √ ] Basic predict")
 
     # Save to CSV
-    save_path = 'predictions/test.csv'
+    save_path = 'predictions/' + cfg.model.name + '_fold_' + str(cfg.experiment.run_fold) + '.csv'
 
     # Check if file exists
     if os.path.exists(save_path):
@@ -49,8 +49,8 @@ def basic_predict(mdl, dl, cfg, tune=None):
             # print(f'filename: {filename}')
 
             # DEBUG: Break
-            if i == 10:
-                break
+            # if i == 10:
+            #     break
 
             ipt = ipt.view(-1, ipt.shape[-3], ipt.shape[-2], ipt.shape[-1])
             lbl = lbl.view(-1, lbl.shape[-1])
@@ -108,7 +108,7 @@ if __name__ == '__main__':
     print('df shape: {}'.format(df.shape))
     print('df head: {}'.format(df.head()))
 
-    df = df[df['fold'] == cfg.experiment.run_fold]
+    df = df[df['fold'] != cfg.experiment.run_fold]
     print('df shape: {}'.format(df.shape))
     print('df length: {}'.format(len(df)))
 
