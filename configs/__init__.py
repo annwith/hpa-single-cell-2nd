@@ -214,7 +214,7 @@ class Config:
     @staticmethod
     def load(file_path):
         with open(file_path) as fp:
-            data = yaml.load(fp)
+            data = yaml.load(fp, Loader=yaml.SafeLoader)
         return Config(data)
 
 

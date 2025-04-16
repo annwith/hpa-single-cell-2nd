@@ -121,6 +121,7 @@ def parse_args(mode='sp'):
     arg('--select', type=str, default='valid_loss')
     arg('--epoch', type=int, default=-1)
     arg('--tag', type=str, default='')
+    arg('--predict_weights_path', type=str, default='')
 
     args = parser.parse_args()
 

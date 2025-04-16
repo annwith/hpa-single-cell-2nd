@@ -34,8 +34,8 @@ model:
 
 train:
   dir: '../results'
-  batch_size: 12
-  num_epochs: 20
+  batch_size: 2
+  num_epochs: 1
   cutmix: False
   beta: 1
   cutmix_prob: 1

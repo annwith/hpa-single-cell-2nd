@@ -324,3 +324,51 @@ class RANZERDataset(Dataset):
             # print(row[self.cols].values.astype(np.float))
             # print(cnt)
             return batch, mask, label, row[self.cols].values.astype(np.float), cnt
+        
+
+class GetPredictionsDataset(Dataset):
+    def __init__(self, df, tfms=None, cfg=None):
+        print('[ i ] GetPredictionsDataset')
+
+        self.df = df.reset_index(drop=True)
+        self.transform = tfms
+        self.cfg = cfg
+        self.tensor_tfms = Compose([
+            ToTensor(),
+            Normalize(mean=[0.485, 0.456, 0.406, 0.406], std=[0.229, 0.224, 0.225, 0.225]),
+        ])
+        self.path = Path(os.path.dirname(os.path.realpath(__file__)))
+        self.cols = ['class{}'.format(i) for i in range(19)]
+        if cfg.data.cell == 'none':
+            self.cell_path = 'notebooks/pad_resized_cell_four'
+        else:
+            self.cell_path = cfg.data.cell
+
+        print('self.cell_path: {}'.format(self.cell_path))
+
+    def __len__(self):
+        return len(self.df)
+
+    def __getitem__(self, index):
+        row = self.df.loc[index]
+        selected = [i for i in range(row['idx'])]
+        cnt = row['idx']
+        filename = row['ID']
+
+        batch = torch.zeros((cnt, 4, self.cfg.transform.size, self.cfg.transform.size))
+        mask = np.zeros((cnt))
+        label = np.zeros((cnt, 19))
+        for idx, s in enumerate(selected):
+            path = self.path / f'../../{self.cell_path}/{row["ID"]}_{s+1}.png'
+            img = imread(path)
+            if self.transform is not None:
+                res = self.transform(image=img)
+                img = res['image']
+            if not img.shape[0] == self.cfg.transform.size:
+                img = cv2.resize(img, (self.cfg.transform.size, self.cfg.transform.size))
+            img = self.tensor_tfms(img)
+            batch[idx, :, :, :] = img
+            mask[idx] = 1
+            label[idx] = row[self.cols].values.astype(np.float64)
+
+        return batch, mask, label, row[self.cols].values.astype(np.float64), cnt, filename
