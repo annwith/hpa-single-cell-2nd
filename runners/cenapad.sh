@@ -29,4 +29,5 @@ PY=python3     # path to python
 PIP=pip       # path to PIP
 
 # Train
-PY main.py train -i b3 -j jakiro/sin_exp5_b3_rare.yaml
+# PY main.py train -i b3 -j jakiro/sin_exp5_b3_rare.yaml
+PY main_cp.py train -i b3 -j jakiro/sin_exp5_b3_rare.yaml

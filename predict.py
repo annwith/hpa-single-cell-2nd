@@ -33,7 +33,7 @@ def basic_predict(mdl, dl, cfg, tune=None):
     results = []
     with torch.no_grad():
         for i, (ipt, mask, lbl, image_lbl, n_cell, filename) in enumerate(tq):
-
+            
             # DEBUG: Print each value and its shape and type
             # print(f'ipt: {ipt.shape}, {ipt.dtype}')
             # print(f'mask: {mask.shape}, {mask.dtype}')
@@ -45,6 +45,7 @@ def basic_predict(mdl, dl, cfg, tune=None):
             n_cell = n_cell[0]
             filename = filename[0]
 
+            # DEBUG: Print each value and its shape and type
             # print(f'n_cell: {n_cell}')
             # print(f'filename: {filename}')
 

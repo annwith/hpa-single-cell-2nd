@@ -122,6 +122,10 @@ class Train(Element):
         self.combine_mix = dict.get('combine_mix', False)
         self.combine_list = dict.get('combine_list', [])
         self.combine_p = dict.get('combine_p', [])
+        self.conf_aware = dict.get('conf_aware', False)
+        self.conf_alpha = dict.get('conf_alpha', 0.5)
+        self.conf_gamma = dict.get('conf_gamma', 0.5)
+        self.conf_csv = dict.get('conf_csv', None)
 
 
 class Eval(Element):
