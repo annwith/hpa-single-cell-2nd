@@ -10,7 +10,7 @@ basic:
 experiment:
   name: 'RandomKTrainTestSplit'
   random_state: 233
-  run_fold: -1
+  run_fold: 0
   batch_sampler: False
   weight: False
   preprocess: JPEG_512_pan
@@ -34,7 +34,7 @@ model:
 
 train:
   dir: '../results'
-  batch_size: 18
+  batch_size: 4
   num_epochs: 16
   cutmix: False
   beta: 1
@@ -45,9 +45,9 @@ train:
   freeze_top_layer_groups: 0
   freeze_start_epoch: 0
   conf_aware: True
-  conf_alpha: 0.5
+  conf_alpha: 1
   conf_gamma: 0.5
-  conf_csv: 'predictions/pred-b3-f0.csv'
+  conf_csv: 'predictions/tf_efficientnet_b3_fold_6.csv'
 
 eval:
   batch_size: 1
@@ -60,7 +60,7 @@ loss:
 
 optimizer:
   name: 'Adam'
-  step: 1
+  step: 4
   params:
     lr: 0.0002
     weight_decay: 0

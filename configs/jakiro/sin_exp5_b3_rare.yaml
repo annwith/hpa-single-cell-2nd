@@ -34,8 +34,8 @@ model:
 
 train:
   dir: '../results'
-  batch_size: 2
-  num_epochs: 1
+  batch_size: 6
+  num_epochs: 20
   cutmix: False
   beta: 1
   cutmix_prob: 1
@@ -45,7 +45,7 @@ train:
   freeze_top_layer_groups: 0
   freeze_start_epoch: 0
   conf_aware: True
-  conf_alpha: 0.5
+  conf_alpha: 1
   conf_gamma: 0.5
   conf_csv: 'predictions/tf_efficientnet_b3_fold_6.csv'
 
@@ -60,7 +60,7 @@ loss:
 
 optimizer:
   name: 'Adam'
-  step: 1
+  step: 2
   params:
     lr: 0.0002
     weight_decay: 0
