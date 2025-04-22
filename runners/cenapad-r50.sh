@@ -1,0 +1,33 @@
+#PBS -N r50-conf-aware
+#PBS -q umagpu
+#PBS -e logs/r50-conf-aware.err
+#PBS -o logs/r50-conf-aware.out
+
+#
+# Train a model to perform multilabel classification.
+#
+
+ENV=cenapad
+SCRATCH=$HOME
+WORK_DIR=$HOME/hpa-single-cell-2nd
+
+unset CUDA_VISIBLE_DEVICES
+# export OMP_NUM_THREADS=8
+
+module load python/3.8.11-gcc-9.4.0
+
+# Activate virtual environment if it exists
+echo "Activating virtual environment... ($HOME/hpa-single-cell-2nd/dev/bin/activate)"
+source $HOME/hpa-single-cell-2nd/dev/bin/activate
+
+# Navigate to the working directory
+cd $WORK_DIR
+echo "Working directory: $(pwd)"
+
+# Set up the environment
+PY=python3     # path to python
+PIP=pip       # path to PIP
+
+# Train
+# $PY main.py train -i r50 -j jakiro/sin_exp5_r50d_rarex2.yaml
+$PY main_cp.py train -i r50 -j jakiro/sin_exp5_r50d_rarex2.yaml

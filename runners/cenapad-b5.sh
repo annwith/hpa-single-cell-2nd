@@ -1,7 +1,7 @@
-#PBS -N hpa-2-place
-#PBS -q testegpu
-#PBS -e logs/test.err
-#PBS -o logs/test.log
+#PBS -N b5-conf-aware
+#PBS -q umagpu
+#PBS -e logs/b5-conf-aware.err
+#PBS -o logs/b5-conf-aware.out
 
 #
 # Train a model to perform multilabel classification.
@@ -29,5 +29,5 @@ PY=python3     # path to python
 PIP=pip       # path to PIP
 
 # Train
-# PY main.py train -i b3 -j jakiro/sin_exp5_b3_rare.yaml
-PY main_cp.py train -i b3 -j jakiro/sin_exp5_b3_rare.yaml
+# $PY main.py train -i b5 -j jakiro/sin_exp5_b5_rare.yaml
+$PY main_cp.py train -i b5 -j jakiro/sin_exp5_b5_rare.yaml
