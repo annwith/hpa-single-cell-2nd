@@ -178,7 +178,7 @@ def basic_train_conf_aware(
                             loss = cfg.loss.cellweight * weighted_loss_cell + weighted_loss_img
                             
                             # DEBUG: Print value
-                            print(f"loss: {loss}")
+                            # print(f"loss: {loss}")
                             
                             losses.append(loss.item())
                     else:

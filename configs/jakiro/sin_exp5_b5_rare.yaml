@@ -22,7 +22,7 @@ experiment:
 
 data:
   dir_sv: '../tile_128'
-  cell: 'input/train_cell_256'
+  cell: 'datasets/hpa-single-cell/input/train_cell_256'
 
 model:
   name: 'tf_efficientnet_b5'

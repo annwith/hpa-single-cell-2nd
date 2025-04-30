@@ -57,7 +57,25 @@ class JakiroResNet200D(nn.Module):
     def __init__(self, model_name='resnet200d', out_features=19, pretrained=False, dropout=0.5,
                  pool='AdaptiveAvgPool2d'):
         super().__init__()
-        self.model = timm.create_model(model_name, pretrained=pretrained)
+
+        print("Model's name:", model_name)
+
+        if model_name == 'resnet50d':
+            checkpoint_path = "/scratch/lerdl/zanoni.dias/HPA-singlecell-2nd-dual-head-pipeline/weights/resnet50d_ra2-464e36ba.pth"
+            state_dict = torch.load(checkpoint_path, map_location="cpu")
+
+            self.model = timm.create_model(model_name, pretrained=False)
+            self.model.load_state_dict(state_dict)
+        elif model_name == 'resnet200d':
+            checkpoint_path = "/scratch/lerdl/zanoni.dias/HPA-singlecell-2nd-dual-head-pipeline/weights/resnet200d_ra2-bdba9bf9.pth"
+            state_dict = torch.load(checkpoint_path, map_location="cpu")
+
+            self.model = timm.create_model(model_name, pretrained=False)
+            self.model.load_state_dict(state_dict)
+        else:
+            self.model = timm.create_model(model_name, pretrained=pretrained)
+        
+        
         self.model.conv1[0] = torch.nn.Conv2d(4, 32, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
         # if pretrained:
         #     pretrained_path = '../input/resnet200d-pretrained-weight/resnet200d_ra2-bdba9bf9.pth'
@@ -73,12 +91,6 @@ class JakiroResNet200D(nn.Module):
         self.last_linear2 = nn.Linear(in_features=n_features, out_features=out_features)
         self.dropout = nn.Dropout(dropout)
 
-    # def forward(self, x):
-    #     bs = x.size(0)
-    #     features = self.model(x)
-    #     pooled_features = self.pooling(features).view(bs, -1)
-    #     output = self.fc(self.dropout(pooled_features))
-    #     return output
     def forward(self, x, cnt):
         features = self.model(x)
         pooled = nn.Flatten()(self.pooling(features))

@@ -30,10 +30,6 @@ class CustomResnetModel(nn.Module):
         self.net.conv1 = nn.Conv2d(4, self.net.conv1.out_channels, kernel_size=self.net.conv1.kernel_size,
                                    stride=self.net.conv1.stride, padding=self.net.conv1.padding, bias=False)
 
-        # self.net.last_linear = nn.Sequential(
-        #     nn.Dropout(0.5),
-        #     nn.Linear(in_features=self.net.last_linear.in_features, out_features=out_features)
-        # )
         self.last_linear = nn.Linear(in_features=self.net.last_linear.in_features, out_features=out_features)
         self.last_linear2 = nn.Linear(in_features=self.net.last_linear.in_features, out_features=out_features)
         self.pool = nn.AdaptiveAvgPool2d(1)
@@ -75,7 +71,19 @@ class DenseNet(nn.Module):
 class CustomSenet(nn.Module):
     def __init__(self, name='se_resnext50_32x4d', pretrained='imagenet', out_features=19, dropout=0.5):
         super().__init__()
-        self.net = pretrainedmodels.__dict__[name](pretrained=pretrained)
+
+        print("Model name:", name)
+
+        if name == 'se_resnext50_32x4d':
+            checkpoint_path = "/scratch/lerdl/zanoni.dias/HPA-singlecell-2nd-dual-head-pipeline/weights/se_resnext50_32x4d-a260b3a4.pth"
+            state_dict = torch.load(checkpoint_path, map_location="cpu")
+            self.net = pretrainedmodels.__dict__[name](pretrained=None)
+            self.net.load_state_dict(state_dict)
+        else:
+            self.net = pretrainedmodels.__dict__[name](pretrained=pretrained)
+
+
+
         self.net.layer0.conv1 = nn.Conv2d(4, self.net.layer0.conv1.out_channels, kernel_size=self.net.layer0.conv1.kernel_size,
                                    stride=self.net.layer0.conv1.stride, padding=self.net.layer0.conv1.padding, bias=False)
         self.last_linear = nn.Linear(in_features=self.net.last_linear.in_features, out_features=out_features)

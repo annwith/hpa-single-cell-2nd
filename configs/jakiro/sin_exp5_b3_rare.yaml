@@ -22,7 +22,7 @@ experiment:
 
 data:
   dir_sv: '../tile_128'
-  cell: 'input/train_cell_256'
+  cell: 'datasets/hpa-single-cell/input/train_cell_256'
 
 model:
   name: 'tf_efficientnet_b3'
@@ -74,5 +74,5 @@ scheduler:
 
 transform:
   name: 's_0220/sin_256_final'
-  num_preprocessor: 10
+  num_preprocessor: 4
   size: 256
