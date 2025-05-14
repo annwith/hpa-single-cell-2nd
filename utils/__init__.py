@@ -70,7 +70,7 @@ def rand_bbox(size, lam):
 
 
 def prepare_for_result(cfg: Config):
-    # print(cfg.train.dir)
+    print(cfg.train.dir)
     if not os.path.exists(cfg.train.dir):
         raise Exception('Result dir not found')
     if os.path.exists(cfg.train.dir + '/' + cfg.basic.id):

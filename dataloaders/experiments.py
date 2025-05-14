@@ -2,12 +2,11 @@ from utils import Config
 import pandas as pd
 from path import Path
 from torch.utils.data import DataLoader, WeightedRandomSampler
-from dataloaders.datasets import ConfAwareRANZERDataset, RANZERDataset
+from dataloaders.datasets import ConfAwareRANZERDataset, collect_changeable_number_of_cells
 from dataloaders.transform_loader import get_tfms
 import os
 import numpy as np
 from dataloaders.sampler import RandomBatchSampler
-from dataloaders.datasets import a_ordinary_collect_method
 
 
 class RandomKTrainTestSplit:
@@ -45,52 +44,18 @@ class RandomKTrainTestSplit:
         else:
             val_tfms = get_tfms(self.cfg.transform.val_name)
 
-        if self.cfg.train.conf_aware:
-            print('[ i ] Use confidence aware training')
-            train_ds = ConfAwareRANZERDataset(
-                df=self.train_meta, tfms=train_tfms, cfg=self.cfg, mode='train')
-            valid_ds = ConfAwareRANZERDataset(
-                df=self.valid_meta, tfms=val_tfms, cfg=self.cfg, mode='valid')
-        else:
-            print('[ i ] Use normal training')
-            train_ds = RANZERDataset(
-                df=self.train_meta, tfms=train_tfms, cfg=self.cfg, mode='train')
-            valid_ds = RANZERDataset(
-                df=self.valid_meta, tfms=val_tfms, cfg=self.cfg, mode='valid')
+        print('[ i ] Use confidence aware dataset (ConfAwareRANZERDataset)')
+        
+        train_ds = ConfAwareRANZERDataset(
+            df=self.train_meta, tfms=train_tfms, cfg=self.cfg, mode='train')
+        valid_ds = ConfAwareRANZERDataset(
+            df=self.valid_meta, tfms=val_tfms, cfg=self.cfg, mode='valid')
 
-        if self.cfg.experiment.weight and train_shuffle:
-            train = self.train_meta.copy()
-            method_dict = {
-                'sqrt': np.sqrt,
-                'log2': np.log2,
-                'log1p': np.log1p,
-                'log10': np.log10,
-                'as_it_is': lambda w: w
-            }
-            if self.cfg.experiment.method in method_dict:
-                print('[ √ ] Use weighted sampler, method: {}'.format(self.cfg.experiment.method))
-                cw = (1 / method_dict[self.cfg.experiment.method](train.iloc[:, :19].sum(0))).values
-                print(train.head(2))
-                weight = (train.iloc[:, :19] * cw).max(1).values
-                print(weight)
-            elif 'pow' in self.cfg.experiment.method:
-                p = float(self.cfg.experiment.method.replace('pow_', ''))
-                print('[ √ ] Use weighted sampler, method: Power of {}'.format(p))
-                for x in ['grapheme_root', 'vowel_diacritic', 'consonant_diacritic']:
-                    train['{}_p'.format(x)] = (1 / np.power(
-                        train[[x, 'fold']].groupby(x).transform('count')['fold'].values, p)
-                                               ) / len(train[x].value_counts())
-                weight = train[['grapheme_root_p', 'vowel_diacritic_p', 'consonant_diacritic_p']].max(1).values
-            else:
-                raise Exception('Unknown weighting method!')
-            rs = WeightedRandomSampler(weights=weight, num_samples=len(weight))
-            train_dl = DataLoader(train_ds, sampler=rs, batch_size=self.cfg.train.batch_size,
-                                  num_workers=self.cfg.transform.num_preprocessor, pin_memory=True)
-        elif self.cfg.experiment.batch_sampler:
-            print('[ i ] Batch Sampler!')
-            bs = RandomBatchSampler(train_ds.df, self.cfg.train.batch_size, cfg=self.cfg)
-            train_dl = DataLoader(dataset=train_ds, batch_sampler=bs,
-                                  num_workers=self.cfg.transform.num_preprocessor)
+        if self.cfg.experiment.count == -1:
+            train_dl = DataLoader(dataset=train_ds, batch_size=self.cfg.train.batch_size,
+                                  num_workers=self.cfg.transform.num_preprocessor,
+                                  collate_fn=collect_changeable_number_of_cells, 
+                                  shuffle=train_shuffle, drop_last=True, pin_memory=True)
         else:
             train_dl = DataLoader(dataset=train_ds, batch_size=self.cfg.train.batch_size,
                                   num_workers=self.cfg.transform.num_preprocessor,
@@ -98,8 +63,7 @@ class RandomKTrainTestSplit:
         if tta == -1:
             tta = 1
 
-        valid_dl = DataLoader(dataset=valid_ds, batch_size=self.cfg.eval.batch_size,
-                              collate_fn=a_ordinary_collect_method, drop_last=True,
+        valid_dl = DataLoader(dataset=valid_ds, batch_size=self.cfg.eval.batch_size, drop_last=True,
                               num_workers=self.cfg.transform.num_preprocessor, pin_memory=True)
         
         return train_dl, valid_dl, None

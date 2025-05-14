@@ -18,9 +18,12 @@ from sklearn.metrics import cohen_kappa_score, mean_squared_error
 from sklearn.metrics import roc_auc_score
 
 
+DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+
 def basic_train(cfg: Config, model, train_dl, valid_dl, loss_func, optimizer, save_path, scheduler, writer, tune=None):
     print(f'[ ! ] pos weight: {1 / cfg.loss.pos_weight}')
-    pos_weight = torch.ones(19).cuda() / cfg.loss.pos_weight
+    pos_weight = torch.ones(19).to(DEVICE) / cfg.loss.pos_weight
     print('[ √ ] Basic training')
     if cfg.transform.size == 512:
         img_size = (600, 800)
@@ -48,12 +51,15 @@ def basic_train(cfg: Config, model, train_dl, valid_dl, loss_func, optimizer, sa
             if cfg.basic.amp == 'Native':
                 scaler = torch.cuda.amp.GradScaler()
             for i, (ipt, mask, lbl, cnt) in enumerate(tq):
-#                 if i == 1:
-#                     break
+
+                # DEBUG
+                # if i == 1:
+                #     break
+                
                 ipt = ipt.view(-1, ipt.shape[-3], ipt.shape[-2], ipt.shape[-1])
                 mask = mask.view(-1)
                 lbl = lbl.view(-1, lbl.shape[-1])
-                exp_label = cnt.cuda()
+                exp_label = cnt.to(DEVICE)
                 # print(cnt.shape)
                 # warm up lr initial
                 if cfg.scheduler.warm_up and epoch == 0:
@@ -61,7 +67,7 @@ def basic_train(cfg: Config, model, train_dl, valid_dl, loss_func, optimizer, sa
                     length = len(train_dl)
                     initial_lr = basic_lr / length
                     optimizer.param_groups[0]['lr'] = initial_lr * (i + 1)
-                ipt, lbl = ipt.cuda(), lbl.cuda()
+                ipt, lbl = ipt.to(DEVICE), lbl.to(DEVICE)
                 r = np.random.rand(1)
                 if cfg.train.cutmix and cfg.train.beta > 0 and r < cfg.train.cutmix_prob:
                     input, target_a, target_b, lam_a, lam_b = cutmix(ipt, lbl, img_size, cfg.train.beta, model)
@@ -70,17 +76,17 @@ def basic_train(cfg: Config, model, train_dl, valid_dl, loss_func, optimizer, sa
                     cell_loss = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight, reduction='none')
                     # print(cell.shape, lam_a.shape, cell_loss(cell, target_a).shape)
                     loss_cell = (cell_loss(cell, target_a).mean(1) * torch.tensor(
-                        lam_a).cuda().float() +
+                        lam_a).to(DEVICE).float() +
                             cell_loss(cell, target_b).mean(1) * torch.tensor(
-                                lam_b).cuda().float())
+                                lam_b).to(DEVICE).float())
                     target_a_exp = target_a.view(-1, cfg.experiment.count, 19).mean(1)
                     target_b_exp = target_b.view(-1, cfg.experiment.count, 19).mean(1)
                     lam_a_exp = lam_a.view(-1, cfg.experiment.count).mean(1)
                     lam_b_exp = lam_b.view(-1, cfg.experiment.count).mean(1)
                     loss_exp = (loss_func(exp, target_a_exp).mean(1) * torch.tensor(
-                        lam_a_exp).cuda().float() +
+                        lam_a_exp).to(DEVICE).float() +
                             loss_func(exp, target_b_exp).mean(1) * torch.tensor(
-                                lam_b_exp).cuda().float())
+                                lam_b_exp).to(DEVICE).float())
                     loss = (loss_cell * 0.1).mean() + loss_exp.mean()
                     # print(loss)
                     losses.append(loss.item())
@@ -172,10 +178,15 @@ def basic_validate(mdl, dl, loss_func, cfg, tune=None):
         results = []
         losses, predicted, predicted_p, truth = [], [], [], []
         for i, (ipt, mask, lbl, cnt, n_cell) in enumerate(dl):
+            
+            # DEBUG
+            # if i == 1:
+            #     break
+
             ipt = ipt.view(-1, ipt.shape[-3], ipt.shape[-2], ipt.shape[-1])
             lbl = lbl.view(-1, lbl.shape[-1])
-            exp_label = cnt.cuda().view(-1, 19)
-            ipt, lbl = ipt.cuda(), lbl.cuda()
+            exp_label = cnt.to(DEVICE).view(-1, 19)
+            ipt, lbl = ipt.to(DEVICE), lbl.to(DEVICE)
             if cfg.basic.amp == 'Native':
                 with torch.cuda.amp.autocast():
                     if 'arc' in cfg.model.name or 'cos' in cfg.model.name:
@@ -217,8 +228,8 @@ def tta_validate(mdl, dl, loss_func, tta):
         losses, predicted, truth = [], [], []
         tq = tqdm.tqdm(dl)
         for i, (ipt, lbl) in enumerate(tq):
-            ipt = [x.cuda() for x in ipt]
-            lbl = lbl.cuda().long()
+            ipt = [x.to(DEVICE) for x in ipt]
+            lbl = lbl.to(DEVICE).long()
             output = mdl(*ipt)
             loss = loss_func(output, lbl)
             losses.append(loss.item())

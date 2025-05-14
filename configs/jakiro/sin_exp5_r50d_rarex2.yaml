@@ -17,12 +17,12 @@ experiment:
   image_only: True
   skip_outlier: True
   outlier: train
-  count: 16
+  count: -1
   csv_file: 256_train+ext+rare.csv
 
 data:
   dir_sv: '../tile_128'
-  cell: 'datasets/hpa-single-cell/input/train_cell_256'
+  cell: '../datasets/input/train_cell_256'
 
 model:
   name: 'resnet50d'
@@ -33,7 +33,7 @@ model:
     pretrained: True
 
 train:
-  dir: '../results'
+  dir: '/home/unicamp/200208/results'
   batch_size: 4
   num_epochs: 16
   cutmix: False
@@ -44,10 +44,11 @@ train:
   freeze_backbond: 1
   freeze_top_layer_groups: 0
   freeze_start_epoch: 0
-  conf_aware: True
+  conf_aware: False
   conf_alpha: 1
   conf_gamma: 0.5
   conf_csv: 'predictions/tf_efficientnet_b3_fold_6.csv'
+  cell_pred_as_labels: False
 
 eval:
   batch_size: 1

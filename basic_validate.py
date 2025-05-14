@@ -18,17 +18,13 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
-def basic_validate(model, dl, cfg, val_report_txt, model_path):
-    print('[ √ ] Validation')
-    print('model_path: {}'.format(model_path))
+DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-    # Set device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    # Move model to device
-    model.to(device)
+def basic_validate(model, dl, cfg, val_report_txt, model_path, mode):
+    print('[ √ ] On validation! mode={}'.format(mode))
+
     model.eval() # Set model to evaluation mode
-
     with torch.no_grad():
         results = []
         losses, predicted, truth = [], [], []
@@ -36,7 +32,7 @@ def basic_validate(model, dl, cfg, val_report_txt, model_path):
 
             ipt = ipt.view(-1, ipt.shape[-3], ipt.shape[-2], ipt.shape[-1])
             exp_label = img_lbl.view(-1, 19)
-            ipt, exp_label = ipt.to(device), exp_label.to(device)
+            ipt, exp_label = ipt.to(DEVICE), exp_label.to(DEVICE)
 
             # Get logits and loss
             if cfg.basic.amp == 'Native':
@@ -71,7 +67,6 @@ def basic_validate(model, dl, cfg, val_report_txt, model_path):
         val_loss = np.array(losses).mean()
         
         # Classification report
-        # Convert to binary predictions
         predicted_binary = (predicted > 0.5).astype(int)
         report = classification_report(
             truth, 
@@ -88,31 +83,40 @@ def basic_validate(model, dl, cfg, val_report_txt, model_path):
         # Save report to txt
         if val_report_txt:
             with open(val_report_txt, 'a') as f:
+                f.write(f'Mode: {mode}\n')
+                f.write(f'Val Fold: {cfg.experiment.run_fold}\n')
                 f.write(f'Model: {model_path}\n')
-                f.write(f'Validation Loss: {val_loss:.4f}\n')
+                f.write(f'Loss: {val_loss:.4f}\n')
                 f.write(report_df.to_string())
                 f.write('\n\n')
     
 
 if __name__ == '__main__':
     print('[ √ ] Landmark!')
+
     args, cfg = parse_args()
+
+    print('[ √ ] cfg.experiment.file: {}'.format(cfg.experiment.file))
+    print('[ √ ] cfg.experiment.run_fold: {}'.format(cfg.experiment.run_fold))
+    train_fold = (cfg.experiment.run_fold + 1) % 5
+    print('[ √ ] train_fold: {}'.format(train_fold))
+
+    if DEVICE.type == 'cuda':
+        print(f"[ i ] Using GPU: {torch.cuda.get_device_name(DEVICE)}")
+    else:
+        print("[ i ] Using CPU")
 
     # Get csv file
     csv_file = cfg.experiment.file
-    print('cfg.experiment.file: {}'.format(cfg.experiment.file))
-
     df = pd.read_csv('dataloaders/split/'+csv_file)
-    print('df shape: {}'.format(df.shape))
-    print('df head: {}'.format(df.head()))
 
-    df = df[df.fold == cfg.experiment.run_fold]
-    print('df shape: {}'.format(df.shape))
+    df_train = df[df.fold == train_fold].copy()
+    df_val = df[df.fold == cfg.experiment.run_fold].copy()
 
     print('[ √ ] Using transformation: {}, image size: {}'.format(
         cfg.transform.val_name, 
-        cfg.transform.size
-    ))
+        cfg.transform.size))
+    
     # if tta_tfms:
     #     val_tfms = tta_tfms
     if cfg.transform.val_name == 'None':
@@ -121,54 +125,66 @@ if __name__ == '__main__':
         val_tfms = get_tfms(cfg.transform.val_name)
 
     # Get dataset
-    ds = RANZERDataset(
-        df=df, tfms=val_tfms, cfg=cfg, mode='valid')
+    ds_train = RANZERDataset(
+        df=df_train, tfms=val_tfms, cfg=cfg, mode='valid')
+    ds_val = RANZERDataset(
+        df=df_val, tfms=val_tfms, cfg=cfg, mode='valid')
     
     # Get dataloader
-    dl = DataLoader(
-        dataset=ds, 
+    dl_train = DataLoader(
+        dataset=ds_train, 
         batch_size=cfg.eval.batch_size,
         num_workers=cfg.transform.num_preprocessor, 
         pin_memory=False)
-    print('dataset size: {}'.format(len(ds)))
-    print('dataloader size: {}'.format(len(dl)))
-    print('batch size: {}'.format(cfg.eval.batch_size))
+    dl_val = DataLoader(
+        dataset=ds_val, 
+        batch_size=cfg.eval.batch_size,
+        num_workers=cfg.transform.num_preprocessor, 
+        pin_memory=False)
+    print('[ i ] train dataset size: {}'.format(len(ds_train)))
+    print('[ i ] val dataset size: {}'.format(len(ds_val)))
+    print('[ i ] train dataloader size: {}'.format(len(dl_train)))
+    print('[ i ] val dataloader size: {}'.format(len(dl_val)))
+    print('[ i ] batch size: {}'.format(cfg.eval.batch_size))
 
     # Get weights path
     weights_path = args.predict_weights_path
-    print('weights_path: {}'.format(weights_path))
+    print('[ i ] weights_path: {}'.format(weights_path))
 
     # Get the files from the weights path
     if os.path.isdir(weights_path):
         files = os.listdir(weights_path)
         files = [f for f in files if f.endswith('.pth')]
         files.sort()
+    else:
+        raise FileNotFoundError(f"Directory {weights_path} does not exist.")
 
-    for f in files:
-        print('file: {}'.format(f))
-        if f.endswith('.pth'):
-            model_path = os.path.join(weights_path, f)
-            print('model_path: {}'.format(model_path))
-    
-        # loading model
+    epoch = 0
+    while True:
+        # Get the file name
+        f = 'f{fold}_epoch-{epoch}.pth'.format(
+            fold=cfg.experiment.run_fold, 
+            epoch=epoch)
+        print('[ i ] file: {}'.format(f))
+
+        if f not in files:
+            print('No more files of this fold to validate.')
+            break
+
+        # Load model
+        model_path = os.path.join(weights_path, f)
         model = get_model(cfg)
-        model.load_state_dict(torch.load(model_path,
-            map_location={'cuda:0': 'cpu', 'cuda:1': 'cpu', 'cuda:2': 'cpu', 'cuda:3': 'cpu'}
-        ))
-        model = model.cpu()
-        print('model loaded')
-        
-        if len(cfg.basic.GPU) == 1:
-            print('[ W ] single gpu prediction the gpus is {}'.format(cfg.basic.GPU))
-            # torch.cuda.set_device(cfg.basic.GPU)
-            model = model.cuda()
-        else:
-            print('[ W ] dp prediction the gpus is {}'.format(cfg.basic.GPU))
-            model = model.cuda()
-            model = torch.nn.DataParallel(model, device_ids=[int(x) for x in cfg.basic.GPU])
+        model.load_state_dict(torch.load(model_path))
+        model.to(DEVICE)
 
-        # predict
-        basic_validate(model, dl, cfg, args.val_report_txt, model_path)
+        # Validate
+        basic_validate(
+            model, dl_train, cfg, args.val_report_txt, model_path, mode='train')
+        basic_validate(
+            model, dl_val, cfg, args.val_report_txt, model_path, mode='valid')
 
-    print('validated')
+        # Next epoch
+        epoch += 1
+
+    print('[ √ ] Validated!')
     

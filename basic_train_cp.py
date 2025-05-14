@@ -11,7 +11,10 @@ except:
     pass
 
 
-def basic_train_conf_aware(
+DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+
+def train(
     cfg: Config, 
     model, 
     train_dl, 
@@ -22,14 +25,11 @@ def basic_train_conf_aware(
     writer, 
     tune=None):
 
-    # Set device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     # Positive weight
     pos_weight = torch.ones(19) / cfg.loss.pos_weight
-    pos_weight = pos_weight.to(device)
+    pos_weight = pos_weight.to(DEVICE)
 
-    print('[ √ ] Basic training confidence aware')
+    print('[ √ ] Training')
     
     # Start training
     try:
@@ -62,37 +62,32 @@ def basic_train_conf_aware(
             
             model.train() # Set model to training mode
 
-            for i, (ipt, mask, lbl, img_lbl, conf_lbl, conf_img_lbl) in enumerate(tq):
-                # i is batch number
-                # ipt are images
-                # mask are masks
-                # lbl are labels
-                # img_lbl is the image label
+            for i, (ipt, lbl, img_lbl, conf_lbl, conf_img_lbl, cnt) in enumerate(tq):
 
                 # DEBUG: Print each value and its shape and type
                 # print(f'ipt: {ipt.shape}, {ipt.dtype}')
-                # print(f'mask: {mask.shape}, {mask.dtype}')
                 # print(f'lbl: {lbl.shape}, {lbl.dtype}')
                 # print(f'image_lbl: {img_lbl.shape}, {img_lbl.dtype}')
                 # print(f'conf_lbl: {conf_lbl.shape}, {conf_lbl.dtype}')
                 # print(f'conf_img_lbl: {conf_img_lbl.shape}, {conf_img_lbl.dtype}')
+                # print(f'cnt: {cnt.shape}, {cnt.dtype}')
                 
                 # DEBUG:
-                # if i == 1:
+                # if i == 10:
                 #     break
 
-                ipt = ipt.view(-1, ipt.shape[-3], ipt.shape[-2], ipt.shape[-1])
-                mask = mask.view(-1)
-                lbl = lbl.view(-1, lbl.shape[-1])
-                conf_lbl = conf_lbl.view(-1, conf_lbl.shape[-1])
+                if cfg.experiment.count > 0:
+                    ipt = ipt.view(-1, ipt.shape[-3], ipt.shape[-2], ipt.shape[-1])
+                    lbl = lbl.view(-1, lbl.shape[-1])
+                    conf_lbl = conf_lbl.view(-1, conf_lbl.shape[-1])
                 
                 # DEBUG: Print each value and its shape and type
                 # print(f'ipt: {ipt.shape}, {ipt.dtype}')
-                # print(f'mask: {mask.shape}, {mask.dtype}')
                 # print(f'lbl: {lbl.shape}, {lbl.dtype}')
                 # print(f'image_lbl: {img_lbl.shape}, {img_lbl.dtype}')
                 # print(f'conf_lbl: {conf_lbl.shape}, {conf_lbl.dtype}')
                 # print(f'conf_img_lbl: {conf_img_lbl.shape}, {conf_img_lbl.dtype}')
+                # print(f'cnt: {cnt.shape}, {cnt.dtype}')
 
                 # Warm up lr initial
                 if cfg.scheduler.warm_up and epoch == 0:
@@ -101,13 +96,12 @@ def basic_train_conf_aware(
                     optimizer.param_groups[0]['lr'] = initial_lr * (i + 1)
                 
                 # Move data to device
-                ipt, mask, lbl, img_lbl, conf_lbl, conf_img_lbl = [
-                    ipt.to(device), 
-                    mask.to(device), 
-                    lbl.to(device), 
-                    img_lbl.to(device), 
-                    conf_lbl.to(device), 
-                    conf_img_lbl.to(device)]
+                ipt, lbl, img_lbl, conf_lbl, conf_img_lbl = [
+                    ipt.to(DEVICE), 
+                    lbl.to(DEVICE), 
+                    img_lbl.to(DEVICE), 
+                    conf_lbl.to(DEVICE), 
+                    conf_img_lbl.to(DEVICE)]
 
                 r = np.random.rand(1) # Why is this needed?
 
@@ -125,47 +119,54 @@ def basic_train_conf_aware(
                             if 'arc' in cfg.model.name or 'cos' in cfg.model.name:
                                 raise NotImplementedError("Model arc or cos is not implemented.")
                             else:
-                                cell, img = model(ipt, cfg.experiment.count)
-
-                            # DEBUG: Print each value and its shape and type
-                            # print(f"cell: {cell.shape}, lbl: {lbl.shape}")
-                            # print("pos_weight: ", pos_weight)
-
-                            # Cell conformity and weight
-                            conformity = 1 - torch.abs(lbl - conf_lbl)
-                            w = cfg.train.conf_alpha * conformity ** cfg.train.conf_gamma
-
-                            # DEBUG: Print each value and its shape and type
-                            # print(f"conformity shape: {conformity.shape}")
-                            # print(f"w shape: {w.shape}")
-
-                            # Image conformity and weight
-                            img_conformity = 1 - torch.abs(img_lbl - conf_img_lbl)
-                            img_w = cfg.train.conf_alpha * img_conformity ** cfg.train.conf_gamma
-
-                            # DEBUG: Print each value and its shape and type
-                            # print(f"img_conformity shape: {img_conformity.shape}")
-                            # print(f"img_w shape: {img_w.shape}")
+                                cell, img = model(ipt, cnt)
 
                             # Cell loss
-                            loss_cell = F.binary_cross_entropy_with_logits(
-                                cell, lbl,
-                                pos_weight=pos_weight,
-                                reduction='none')
-                            weighted_loss_cell = loss_cell * w
+                            if cfg.train.cell_pred_as_labels:
+                                loss_cell = F.binary_cross_entropy_with_logits(
+                                    cell, conf_lbl,
+                                    pos_weight=pos_weight,
+                                    reduction='none')
+                            else:
+                                loss_cell = F.binary_cross_entropy_with_logits(
+                                    cell, lbl,
+                                    pos_weight=pos_weight,
+                                    reduction='none')
 
                             # DEBUG: Print each value and its shape and type
                             # print(f"loss_cell: {loss_cell.shape}")
-                            # print(f"weighted_loss_cell: {weighted_loss_cell.shape}")
                             
                             # Image loss
                             loss_img = F.binary_cross_entropy_with_logits(
                                 img, img_lbl,
                                 reduction='none')
-                            weighted_loss_img = loss_img * img_w
 
                             # DEBUG: Print each value and its shape and type
                             # print(f"loss_img: {loss_img.shape}")
+
+                            if cfg.train.conf_aware:
+                                conformity = 1 - torch.abs(lbl - conf_lbl)
+                                w = cfg.train.conf_alpha * conformity ** cfg.train.conf_gamma
+
+                                # DEBUG: Print each value and its shape and type
+                                # print(f"conformity shape: {conformity.shape}")
+                                # print(f"w shape: {w.shape}")
+
+                                img_conformity = 1 - torch.abs(img_lbl - conf_img_lbl)
+                                img_w = cfg.train.conf_alpha * img_conformity ** cfg.train.conf_gamma
+
+                                # DEBUG: Print each value and its shape and type
+                                # print(f"img_conformity shape: {img_conformity.shape}")
+                                # print(f"img_w shape: {img_w.shape}")
+
+                                weighted_loss_cell = loss_cell * w
+                                weighted_loss_img = loss_img * img_w
+                            else:
+                                weighted_loss_cell = loss_cell
+                                weighted_loss_img = loss_img
+
+                            # DEBUG: Print each value and its shape and type
+                            # print(f"weighted_loss_cell: {weighted_loss_cell.shape}")
                             # print(f"weighted_loss_img: {weighted_loss_img.shape}")
                             
                             # Calculate mean if needed
@@ -222,7 +223,7 @@ def basic_train_conf_aware(
                     tq.set_postfix(loss=np.array(losses).mean(), lr=optimizer.param_groups[0]['lr'])
 
             # Validation
-            validate_loss = basic_validate(model, valid_dl, cfg, writer)
+            validate_loss = validate(model, valid_dl, cfg, writer)
             print(('[ √ ] epochs: {}, train loss: {:.4f}, valid loss: {:.4f}').format(
                 epoch, np.array(losses).mean(), validate_loss))
             
@@ -248,45 +249,46 @@ def basic_train_conf_aware(
         torch.save(model.state_dict(), save_path / 'checkpoints/quit_f{}.pth'.format(cfg.experiment.run_fold))
 
 
-def basic_validate(
+def validate(
     model, 
-    dl, 
-    cfg, 
+    valid_dl, 
+    cfg,
     writer):
     
     print('[ √ ] Validation')
 
-    # Set device
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     # Move model to device
-    model.to(device)
+    model.to(DEVICE)
 
-    model.eval() # Set model to evaluation mode
+    # Set model to evaluation mode
+    model.eval()
+
+    # Set tqdm progress bar
+    tq = tqdm.tqdm(valid_dl)
 
     with torch.no_grad():
         results = []
         losses, predicted, truth = [], [], []
-        for i, (ipt, mask, lbl, img_lbl, n_cell) in enumerate(dl):
+        for i, (ipt, lbl, img_lbl, n_cell) in enumerate(tq):
 
             # DEBUG:
-            # if i == 5:
+            # if i == 10:
             #     break
 
             ipt = ipt.view(-1, ipt.shape[-3], ipt.shape[-2], ipt.shape[-1])
-            exp_label = img_lbl.view(-1, 19)
-            ipt, exp_label = ipt.to(device), exp_label.to(device)
+            img_lbl = img_lbl.view(-1, 19)
+            ipt, img_lbl = ipt.to(DEVICE), img_lbl.to(DEVICE)
 
             # DEBUG: Print each value and its shape and type
             # print(f"ipt: {ipt.shape}, {ipt.dtype}")
-            # print(f"exp_label: {exp_label.shape}, {exp_label.dtype}")
+            # print(f"img_lbl: {img_lbl.shape}, {img_lbl.dtype}")
 
             # Get logits and loss
             if cfg.basic.amp == 'Native':
                 with torch.cuda.amp.autocast():
                     _, output = model(ipt, n_cell)
                     loss = F.binary_cross_entropy_with_logits(
-                        output, exp_label,
+                        output, img_lbl,
                         reduction='none')
                     if not len(loss.shape) == 0:
                         loss = loss.mean()
@@ -301,11 +303,11 @@ def basic_validate(
 
             # DEBUG: Print each value and its shape and type
             # print(f"predicted: {pred.shape}, {pred.dtype}")
-            # print(f"truth: {exp_label.shape}, {exp_label.dtype}")
+            # print(f"truth: {img_lbl.shape}, {img_lbl.dtype}")
 
             # Append to lists
             predicted.append(pred)
-            truth.append(exp_label.cpu().numpy())
+            truth.append(img_lbl.cpu().numpy())
             
             results.append({
                 'step': i,
@@ -325,7 +327,6 @@ def basic_validate(
         # print(f"truth: {truth.shape}, {truth.dtype}")
         
         # Classification report
-        # Convert to binary predictions
         predicted_binary = (predicted > 0.5).astype(int)
         report = classification_report(
             truth, 
@@ -334,8 +335,6 @@ def basic_validate(
 
         # Convert to DataFrame for nicer formatting
         report_df = pd.DataFrame(report).transpose()
-
-        # Round for readability
         report_df = report_df.round(4)
         print(report_df)
 

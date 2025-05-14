@@ -63,7 +63,7 @@ class Experiment(Element):
         self.outlier = dict.get('outlier', 'train')
         self.outlier_method = dict.get('outlier_method', 'drop')
         self.file = dict.get('csv_file', 'none')
-        self.smoothing = dict.get('smoothing', 0)
+        self.smoothing = dict.get('smoothing', False)
 
 
 class Data(Element):
@@ -126,6 +126,7 @@ class Train(Element):
         self.conf_alpha = dict.get('conf_alpha', 0.5)
         self.conf_gamma = dict.get('conf_gamma', 0.5)
         self.conf_csv = dict.get('conf_csv', None)
+        self.cell_pred_as_labels = dict.get('cell_pred_as_labels', False)
 
 
 class Eval(Element):

@@ -2,7 +2,7 @@ from utils import parse_args, prepare_for_result
 from dataloaders import get_dataloader
 from models import get_model
 from optimizers import get_optimizer
-from basic_train_cp import basic_train_conf_aware
+from basic_train_cp import train
 from scheduler import get_scheduler
 from utils import load_matched_state
 from torch.utils.tensorboard import SummaryWriter
@@ -16,6 +16,9 @@ import warnings
 warnings.filterwarnings('ignore')
 
 
+DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+
 if __name__ == '__main__':
     print('[ √ ] Landmark!')
     args, cfg = parse_args()
@@ -24,8 +27,7 @@ if __name__ == '__main__':
     writer = SummaryWriter(log_dir=result_path)
     cfg.dump_json(result_path / 'config.json')
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print('[ i ] Using device: {}'.format(device))
+    print('[ i ] Using device: {}'.format(DEVICE))
 
     # Multiple fold training
     if cfg.experiment.run_fold == -1:
@@ -39,7 +41,7 @@ if __name__ == '__main__':
             print('[ i ] The length of train_dl is {}, valid dl is {}'.format(len(train_dl), len(valid_dl)))
             
             model = get_model(cfg)
-            model = model.to(device)
+            model = model.to(DEVICE)
             if not cfg.model.from_checkpoint == 'none':
                 print('[ ! ] loading model from checkpoint: {}'.format(cfg.model.from_checkpoint))
                 load_matched_state(model, torch.load(cfg.model.from_checkpoint))
@@ -60,12 +62,8 @@ if __name__ == '__main__':
             if len(cfg.basic.GPU) > 1:
                 model = torch.nn.DataParallel(model)
         
-        if cfg.train.conf_aware:
-            print('[ ! ] Use confidence aware training')
-            basic_train_conf_aware(
+            train(
                 cfg, model, train_dl, valid_dl, optimizer, result_path, scheduler, writer)
-        else:
-            raise NotImplementedError('Normal training is not implemented on this script.')
     
     # Single fold training
     else:
@@ -75,7 +73,7 @@ if __name__ == '__main__':
         print('[ i ] The length of train_dl is {}, valid dl is {}'.format(len(train_dl), len(valid_dl)))
 
         model = get_model(cfg)
-        model = model.to(device)    
+        model = model.to(DEVICE)    
         if not cfg.model.from_checkpoint == 'none':
             print('[ ! ] loading model from checkpoint: {}'.format(cfg.model.from_checkpoint))
             load_matched_state(model, torch.load(cfg.model.from_checkpoint, map_location='cpu'))
@@ -95,9 +93,5 @@ if __name__ == '__main__':
         if len(cfg.basic.GPU) > 1:
             model = torch.nn.DataParallel(model)
 
-        if cfg.train.conf_aware:
-            print('[ ! ] Use confidence aware training')
-            basic_train_conf_aware(
-                cfg, model, train_dl, valid_dl, optimizer, result_path, scheduler, writer)
-        else:
-            raise NotImplementedError('Normal training is not implemented on this script.')
+        train(
+            cfg, model, train_dl, valid_dl, optimizer, result_path, scheduler, writer)

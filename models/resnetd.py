@@ -60,22 +60,24 @@ class JakiroResNet200D(nn.Module):
 
         print("Model's name:", model_name)
 
-        if model_name == 'resnet50d':
-            checkpoint_path = "/scratch/lerdl/zanoni.dias/HPA-singlecell-2nd-dual-head-pipeline/weights/resnet50d_ra2-464e36ba.pth"
-            state_dict = torch.load(checkpoint_path, map_location="cpu")
+        # if model_name == 'resnet50d':
+        #     checkpoint_path = "/scratch/lerdl/zanoni.dias/HPA-singlecell-2nd-dual-head-pipeline/weights/resnet50d_ra2-464e36ba.pth"
+        #     state_dict = torch.load(checkpoint_path, map_location="cpu")
 
-            self.model = timm.create_model(model_name, pretrained=False)
-            self.model.load_state_dict(state_dict)
-        elif model_name == 'resnet200d':
-            checkpoint_path = "/scratch/lerdl/zanoni.dias/HPA-singlecell-2nd-dual-head-pipeline/weights/resnet200d_ra2-bdba9bf9.pth"
-            state_dict = torch.load(checkpoint_path, map_location="cpu")
+        #     self.model = timm.create_model(model_name, pretrained=False)
+        #     self.model.load_state_dict(state_dict)
+        # elif model_name == 'resnet200d':
+        #     checkpoint_path = "/scratch/lerdl/zanoni.dias/HPA-singlecell-2nd-dual-head-pipeline/weights/resnet200d_ra2-bdba9bf9.pth"
+        #     state_dict = torch.load(checkpoint_path, map_location="cpu")
 
-            self.model = timm.create_model(model_name, pretrained=False)
-            self.model.load_state_dict(state_dict)
-        else:
-            self.model = timm.create_model(model_name, pretrained=pretrained)
+        #     self.model = timm.create_model(model_name, pretrained=False)
+        #     self.model.load_state_dict(state_dict)
+        # else:
+        #     self.model = timm.create_model(model_name, pretrained=pretrained)
         
-        
+        self.model = timm.create_model(
+            model_name, pretrained=pretrained)
+
         self.model.conv1[0] = torch.nn.Conv2d(4, 32, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
         # if pretrained:
         #     pretrained_path = '../input/resnet200d-pretrained-weight/resnet200d_ra2-bdba9bf9.pth'
@@ -94,11 +96,16 @@ class JakiroResNet200D(nn.Module):
     def forward(self, x, cnt):
         features = self.model(x)
         pooled = nn.Flatten()(self.pooling(features))
-        viewed_pooled = pooled.view(-1, cnt, pooled.shape[-1])
-        # print(viewed_pooled.shape)
-        viewed_pooled = viewed_pooled.max(1)[0]
-        # print(viewed_pooled.shape)
-        return self.last_linear(self.dropout(pooled)), self.last_linear2(self.dropout(viewed_pooled))
+        
+        # separa os vetores de células por imagem
+        pooled_split = torch.split(pooled, cnt.tolist())  # lista de tensores (n_células_i, features)
+        # print("pooled_split", len(pooled_split), pooled_split[0].shape)
+
+        # aplica max pooling por imagem (dim=0: entre as células)
+        pooled_per_img = torch.stack([p.max(0)[0] for p in pooled_split])
+        # print("pooled_per_img", pooled_per_img.shape)  # (batch_size, features)
+        
+        return self.last_linear(self.dropout(pooled)), self.last_linear2(self.dropout(pooled_per_img))
 
 
     @property

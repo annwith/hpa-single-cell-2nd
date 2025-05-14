@@ -25,25 +25,11 @@ class GeM(nn.Module):
 class EfficinetNet(nn.Module):
     def __init__(self, name='efficientnet_b0', pretrained='imagenet', out_features=81313, dropout=0.5, feature_dim=512):
         super().__init__()
-        repo_dir = "/scratch/lerdl/zanoni.dias/gen-efficientnet-pytorch"
 
         print("Model's name:", name)
 
-        if name == 'tf_efficientnet_b3':
-            checkpoint_path = "/scratch/lerdl/zanoni.dias/HPA-singlecell-2nd-dual-head-pipeline/weights/tf_efficientnet_b3_aa-84b4657e.pth"
-            state_dict = torch.load(checkpoint_path, map_location="cpu")
-
-            self.model = torch.hub.load(repo_dir, name, source='local', pretrained=False)
-            self.model.load_state_dict(state_dict)
-        elif name == 'tf_efficientnet_b5':
-            checkpoint_path = "/scratch/lerdl/zanoni.dias/HPA-singlecell-2nd-dual-head-pipeline/weights/tf_efficientnet_b5_ra-9a3e5369.pth"
-            state_dict = torch.load(checkpoint_path, map_location="cpu")
-
-            self.model = torch.hub.load(repo_dir, name, source='local', pretrained=False)
-            self.model.load_state_dict(state_dict)
-        else:
-            self.model = torch.hub.load('rwightman/gen-efficientnet-pytorch', name,
-                                        pretrained=(pretrained == 'imagenet'))
+        self.model = torch.hub.load('rwightman/gen-efficientnet-pytorch', name,
+                                    pretrained=(pretrained == 'imagenet'))
 
         self.model.conv_stem = Conv2dSame(4, self.model.conv_stem.out_channels, kernel_size=(3, 3), stride=(2, 2), bias=False)
         self.last_linear = nn.Linear(in_features=self.model.classifier.in_features, out_features=out_features)
@@ -51,14 +37,22 @@ class EfficinetNet(nn.Module):
         self.pool = GeM()
         self.dropout = nn.Dropout(dropout)
 
-    def forward(self, x, cnt=16):
-        # print("on model forward")
+    def forward(self, x, cnt):
+        print("on model forward")
+        print("cnt", cnt)
+
         x = self.model.features(x)
-        # print("x", x.shape)
+        print("x", x.shape)
+        
         pooled = nn.Flatten()(self.pool(x))
-        # print("pooled", pooled.shape)
-        viewed_pooled = pooled.view(-1, cnt, pooled.shape[-1])
-        # print("viewed_pooled", viewed_pooled.shape)
-        viewed_pooled = viewed_pooled.max(1)[0]
-        # print("viewed_pooled", viewed_pooled.shape)
-        return self.last_linear(self.dropout(pooled)), self.last_linear2(self.dropout(viewed_pooled))
+        print("pooled", pooled.shape)
+        
+        # separa os vetores de células por imagem
+        pooled_split = torch.split(pooled, cnt.tolist())  # lista de tensores (n_células_i, features)
+        print("pooled_split", len(pooled_split), pooled_split[0].shape)
+
+        # aplica max pooling por imagem (dim=0: entre as células)
+        pooled_per_img = torch.stack([p.max(0)[0] for p in pooled_split])
+        print("pooled_per_img", pooled_per_img.shape)  # (batch_size, features)
+
+        return self.last_linear(self.dropout(pooled)), self.last_linear2(self.dropout(pooled_per_img))

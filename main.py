@@ -26,6 +26,8 @@ from sklearn.metrics import roc_auc_score
 import warnings
 warnings.filterwarnings('ignore')
 
+DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 
 if __name__ == '__main__':
     print('[ √ ] Landmark!')
@@ -60,7 +62,7 @@ if __name__ == '__main__':
         model = get_model(cfg)
         if cfg.loss.name == 'weighted_ce_loss':
             # if we use weighted ce loss, we load the loss here.
-            weights = torch.Tensor(cfg.loss.param['weight']).cuda()
+            weights = torch.Tensor(cfg.loss.param['weight']).to(DEVICE)
             loss_func = torch.nn.CrossEntropyLoss(weight=weights, reduction='none')
         else:
             loss_func = get_loss(cfg)
@@ -71,11 +73,10 @@ if __name__ == '__main__':
         model = model.cpu()
         if len(cfg.basic.GPU) == 1:
             print('[ W ] single gpu prediction the gpus is {}'.format(cfg.basic.GPU))
-            # torch.cuda.set_device(cfg.basic.GPU)
-            model = model.cuda()
+            model = model.to(DEVICE)
         else:
             print('[ W ] dp prediction the gpus is {}'.format(cfg.basic.GPU))
-            model = model.cuda()
+            model = model.to(DEVICE)
             model = torch.nn.DataParallel(model, device_ids=[int(x) for x in cfg.basic.GPU])
         # predict valid
         model.eval()
@@ -83,7 +84,7 @@ if __name__ == '__main__':
             tq = tqdm(valid_dl)
             outputs = []
             for i, (ipt, lbl) in enumerate(tq):
-                ipt = ipt.cuda()
+                ipt = ipt.to(DEVICE)
                 output = model(ipt)
                 outputs.append(output.cpu().sigmoid().numpy())
         pred = np.concatenate(outputs).reshape(-1)
@@ -99,7 +100,7 @@ if __name__ == '__main__':
             tq = tqdm(test_dl)
             outputs = []
             for i, (ipt, lbl) in enumerate(tq):
-                ipt = ipt.cuda()
+                ipt = ipt.to(DEVICE)
                 output = model(ipt)
                 outputs.append(output.cpu().sigmoid().numpy())
         pred = np.concatenate(outputs).reshape(-1)
@@ -140,14 +141,14 @@ if __name__ == '__main__':
             cfg.experiment.run_fold = i
             train_dl, valid_dl, test_dl = get_dataloader(cfg)(cfg).get_dataloader()
             print('[ i ] The length of train_dl is {}, valid dl is {}'.format(len(train_dl), len(valid_dl)))
-            model = get_model(cfg).cuda()
+            model = get_model(cfg).to(DEVICE)
             if not cfg.model.from_checkpoint == 'none':
                 print('[ ! ] loading model from checkpoint: {}'.format(cfg.model.from_checkpoint))
                 load_matched_state(model, torch.load(cfg.model.from_checkpoint))
                 # model.load_state_dict(torch.load(cfg.model.from_checkpoint))
             if cfg.loss.name == 'weighted_ce_loss':
                 # if we use weighted ce loss, we load the loss here.
-                weights = torch.Tensor(cfg.loss.param['weight']).cuda()
+                weights = torch.Tensor(cfg.loss.param['weight']).to(DEVICE)
                 loss_func = torch.nn.CrossEntropyLoss(weight=weights, reduction='none')
             else:
                 loss_func = get_loss(cfg)
@@ -167,14 +168,14 @@ if __name__ == '__main__':
     else:
         train_dl, valid_dl, test_dl = get_dataloader(cfg)(cfg).get_dataloader()
         print('[ i ] The length of train_dl is {}, valid dl is {}'.format(len(train_dl), len(valid_dl)))
-        model = get_model(cfg).cuda()
+        model = get_model(cfg).to(DEVICE)
         if not cfg.model.from_checkpoint == 'none':
             print('[ ! ] loading model from checkpoint: {}'.format(cfg.model.from_checkpoint))
             load_matched_state(model, torch.load(cfg.model.from_checkpoint, map_location='cpu'))
             # model.load_state_dict(torch.load(cfg.model.from_checkpoint))
         if cfg.loss.name == 'weighted_ce_loss':
             # if we use weighted ce loss, we load the loss here.
-            weights = torch.Tensor(cfg.loss.param['weight']).cuda()
+            weights = torch.Tensor(cfg.loss.param['weight']).to(DEVICE)
             loss_func = torch.nn.CrossEntropyLoss(weight=weights, reduction='none')
         else:
             loss_func = get_loss(cfg)
