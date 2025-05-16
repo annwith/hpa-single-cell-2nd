@@ -73,8 +73,8 @@ def train(
                 # print(f'cnt: {cnt.shape}, {cnt.dtype}')
                 
                 # DEBUG:
-                # if i == 10:
-                #     break
+                if cfg.basic.debug and i == 10:
+                    break
 
                 if cfg.experiment.count > 0:
                     ipt = ipt.view(-1, ipt.shape[-3], ipt.shape[-2], ipt.shape[-1])
@@ -272,8 +272,8 @@ def validate(
         for i, (ipt, lbl, img_lbl, n_cell) in enumerate(tq):
 
             # DEBUG:
-            # if i == 10:
-            #     break
+            if cfg.basic.debug and i == 10:
+                break
 
             ipt = ipt.view(-1, ipt.shape[-3], ipt.shape[-2], ipt.shape[-1])
             img_lbl = img_lbl.view(-1, 19)

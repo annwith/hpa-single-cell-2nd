@@ -1,7 +1,7 @@
 basic:
   seed: 233
   GPU: 0
-  debug: False
+  debug: True
   id: 'unnamed'
   mode: train
   search: False
@@ -35,7 +35,7 @@ model:
 
 train:
   dir: '/home/unicamp/200208/results'
-  batch_size: 2
+  batch_size: 6
   num_epochs: 20
   cutmix: False
   beta: 1
@@ -46,7 +46,7 @@ train:
   freeze_top_layer_groups: 0
   freeze_start_epoch: 0
   conf_aware: False
-  conf_alpha: 1
+  conf_alpha: 1 
   conf_gamma: 0.5
   conf_csv: 'predictions/tf_efficientnet_b3_fold_6.csv'
   cell_pred_as_labels: False
@@ -64,7 +64,7 @@ optimizer:
   name: 'Adam'
   step: 2
   params:
-    lr: 0.0001
+    lr: 0.0002
     weight_decay: 0
 
 scheduler:
@@ -76,5 +76,5 @@ scheduler:
 
 transform:
   name: 's_0220/sin_256_final'
-  num_preprocessor: 4
+  num_preprocessor: 8
   size: 256

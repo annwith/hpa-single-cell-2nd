@@ -38,21 +38,21 @@ class EfficinetNet(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def forward(self, x, cnt):
-        print("on model forward")
-        print("cnt", cnt)
+        # print("on model forward")
+        # print("cnt", cnt)
 
         x = self.model.features(x)
-        print("x", x.shape)
+        # print("x", x.shape)
         
         pooled = nn.Flatten()(self.pool(x))
-        print("pooled", pooled.shape)
+        # print("pooled", pooled.shape)
         
         # separa os vetores de células por imagem
         pooled_split = torch.split(pooled, cnt.tolist())  # lista de tensores (n_células_i, features)
-        print("pooled_split", len(pooled_split), pooled_split[0].shape)
+        # print("pooled_split", len(pooled_split), pooled_split[0].shape)
 
         # aplica max pooling por imagem (dim=0: entre as células)
         pooled_per_img = torch.stack([p.max(0)[0] for p in pooled_split])
-        print("pooled_per_img", pooled_per_img.shape)  # (batch_size, features)
+        # print("pooled_per_img", pooled_per_img.shape)  # (batch_size, features)
 
         return self.last_linear(self.dropout(pooled)), self.last_linear2(self.dropout(pooled_per_img))

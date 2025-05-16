@@ -235,6 +235,7 @@ class ConfAwareRANZERDataset(Dataset):  # Inherits from PyTorch's Dataset class
             if self.cfg.experiment.smoothing == 0:
                 return batch, label, img_label, conf, img_conf, cnt
             else:
+                print("smooooooooooothing")
                 label = 0.9 * label + 0.1 / 19
                 img_label = 0.9 * img_label + 0.1 / 19
                 return batch, label, img_label, conf, img_conf, cnt
