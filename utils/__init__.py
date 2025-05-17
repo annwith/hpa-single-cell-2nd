@@ -3,8 +3,7 @@ import os
 import torch
 import numpy as np
 import random
-import requests as req
-import json
+import psutil
 from configs import get_config, Config
 from path import Path
 import pandas as pd
@@ -15,6 +14,22 @@ VOWEL_DIACRITIC = 11 #vowel_diacritic: 11
 CONSONANT_DIACRITIC = 7 #consonant_diacritic: 7
 
 ON_KAGGLE: bool = 'KAGGLE_WORKING_DIR' in os.environ
+
+
+def print_memory_foot():
+    # Get CPU and RAM usage
+    cpu_mem = psutil.virtual_memory()
+    cpu_mem_used = cpu_mem.used / (1024 ** 3)  # Convert to GB
+    cpu_mem_free = cpu_mem.available / (1024 ** 3)  # Convert to GB
+
+    # Get GPU usage
+    gpu_mem_used = torch.cuda.memory_allocated(0) / (1024 ** 3)
+    gpu_mem_free = (
+        torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved(0)
+    ) / (1024 ** 3)
+
+    # Print memory foot
+    print(f"GPU: {gpu_mem_used:.2f}GB / {gpu_mem_free:.2f}GB | CPU: {cpu_mem_used:.2f}GB / {cpu_mem_free:.2f}GB", flush=True)
 
 
 def tile(img, sz=128, N=12):
