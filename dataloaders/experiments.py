@@ -55,15 +55,15 @@ class RandomKTrainTestSplit:
             train_dl = DataLoader(dataset=train_ds, batch_size=self.cfg.train.batch_size,
                                   num_workers=self.cfg.transform.num_preprocessor,
                                   collate_fn=collect_changeable_number_of_cells, 
-                                  shuffle=train_shuffle, drop_last=True, pin_memory=True)
+                                  shuffle=train_shuffle, drop_last=True, pin_memory=False)
         else:
             train_dl = DataLoader(dataset=train_ds, batch_size=self.cfg.train.batch_size,
                                   num_workers=self.cfg.transform.num_preprocessor,
-                                  shuffle=train_shuffle, drop_last=True, pin_memory=True)
+                                  shuffle=train_shuffle, drop_last=True, pin_memory=False)
         if tta == -1:
             tta = 1
 
         valid_dl = DataLoader(dataset=valid_ds, batch_size=self.cfg.eval.batch_size, drop_last=True,
-                              num_workers=self.cfg.transform.num_preprocessor, pin_memory=True)
+                              num_workers=self.cfg.transform.num_preprocessor, pin_memory=False)
         
         return train_dl, valid_dl, None

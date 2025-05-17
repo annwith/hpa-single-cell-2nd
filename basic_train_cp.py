@@ -4,6 +4,7 @@ from configs import Config
 import torch
 import torch.nn.functional as F
 from sklearn.metrics import classification_report
+import gc
 
 try:
     from apex import amp
@@ -65,12 +66,13 @@ def train(
             for i, (ipt, lbl, img_lbl, conf_lbl, conf_img_lbl, cnt) in enumerate(tq):
 
                 # DEBUG: Print each value and its shape and type
-                # print(f'ipt: {ipt.shape}, {ipt.dtype}')
-                # print(f'lbl: {lbl.shape}, {lbl.dtype}')
-                # print(f'image_lbl: {img_lbl.shape}, {img_lbl.dtype}')
-                # print(f'conf_lbl: {conf_lbl.shape}, {conf_lbl.dtype}')
-                # print(f'conf_img_lbl: {conf_img_lbl.shape}, {conf_img_lbl.dtype}')
-                # print(f'cnt: {cnt.shape}, {cnt.dtype}')
+                if cfg.basic.debug:
+                    print(f'ipt: {ipt.shape}, {ipt.dtype}')
+                    print(f'lbl: {lbl.shape}, {lbl.dtype}')
+                    print(f'image_lbl: {img_lbl.shape}, {img_lbl.dtype}')
+                    print(f'conf_lbl: {conf_lbl.shape}, {conf_lbl.dtype}')
+                    print(f'conf_img_lbl: {conf_img_lbl.shape}, {conf_img_lbl.dtype}')
+                    print(f'cnt: {cnt.shape}, {cnt.dtype}')
                 
                 # DEBUG:
                 if cfg.basic.debug and i == 10:
@@ -82,12 +84,13 @@ def train(
                     conf_lbl = conf_lbl.view(-1, conf_lbl.shape[-1])
                 
                 # DEBUG: Print each value and its shape and type
-                # print(f'ipt: {ipt.shape}, {ipt.dtype}')
-                # print(f'lbl: {lbl.shape}, {lbl.dtype}')
-                # print(f'image_lbl: {img_lbl.shape}, {img_lbl.dtype}')
-                # print(f'conf_lbl: {conf_lbl.shape}, {conf_lbl.dtype}')
-                # print(f'conf_img_lbl: {conf_img_lbl.shape}, {conf_img_lbl.dtype}')
-                # print(f'cnt: {cnt.shape}, {cnt.dtype}')
+                if cfg.basic.debug:
+                    print(f'ipt: {ipt.shape}, {ipt.dtype}')
+                    print(f'lbl: {lbl.shape}, {lbl.dtype}')
+                    print(f'image_lbl: {img_lbl.shape}, {img_lbl.dtype}')
+                    print(f'conf_lbl: {conf_lbl.shape}, {conf_lbl.dtype}')
+                    print(f'conf_img_lbl: {conf_img_lbl.shape}, {conf_img_lbl.dtype}')
+                    print(f'cnt: {cnt.shape}, {cnt.dtype}')
 
                 # Warm up lr initial
                 if cfg.scheduler.warm_up and epoch == 0:
@@ -106,10 +109,11 @@ def train(
                 r = np.random.rand(1) # Why is this needed?
 
                 # DEBUG: Print each value
-                # print(f"r: {r}")
-                # print(f"cfg.train.cutmix: {cfg.train.cutmix}")
-                # print(f"cfg.train.beta: {cfg.train.beta}")
-                # print(f"cfg.train.cutmix_prob: {cfg.train.cutmix_prob}")
+                if cfg.basic.debug:
+                    print(f"r: {r}")
+                    print(f"cfg.train.cutmix: {cfg.train.cutmix}")
+                    print(f"cfg.train.beta: {cfg.train.beta}")
+                    print(f"cfg.train.cutmix_prob: {cfg.train.cutmix_prob}")
 
                 if cfg.train.cutmix and cfg.train.beta > 0 and r < cfg.train.cutmix_prob:
                     raise NotImplementedError("cfg.train.cutmix is not implemented.")
@@ -133,41 +137,45 @@ def train(
                                     pos_weight=pos_weight,
                                     reduction='none')
 
-                            # DEBUG: Print each value and its shape and type
-                            # print(f"loss_cell: {loss_cell.shape}")
-                            
                             # Image loss
                             loss_img = F.binary_cross_entropy_with_logits(
                                 img, img_lbl,
                                 reduction='none')
 
                             # DEBUG: Print each value and its shape and type
-                            # print(f"loss_img: {loss_img.shape}")
+                            if cfg.basic.debug:
+                                print(f"loss_cell: {loss_cell.shape}")
+                                print(f"loss_img: {loss_img.shape}")
 
                             if cfg.train.conf_aware:
+                                # Cell conformity
                                 conformity = 1 - torch.abs(lbl - conf_lbl)
                                 w = cfg.train.conf_alpha * conformity ** cfg.train.conf_gamma
 
-                                # DEBUG: Print each value and its shape and type
-                                # print(f"conformity shape: {conformity.shape}")
-                                # print(f"w shape: {w.shape}")
-
+                                # Image conformity
                                 img_conformity = 1 - torch.abs(img_lbl - conf_img_lbl)
                                 img_w = cfg.train.conf_alpha * img_conformity ** cfg.train.conf_gamma
 
                                 # DEBUG: Print each value and its shape and type
-                                # print(f"img_conformity shape: {img_conformity.shape}")
-                                # print(f"img_w shape: {img_w.shape}")
+                                if cfg.basic.debug:
+                                    print(f"conformity shape: {conformity.shape}")
+                                    print(f"w shape: {w.shape}")
+                                    print(f"img_conformity shape: {img_conformity.shape}")
+                                    print(f"img_w shape: {img_w.shape}")
 
                                 weighted_loss_cell = loss_cell * w
                                 weighted_loss_img = loss_img * img_w
+
+                                del conformity, w, img_conformity, img_w
+                                gc.collect()
                             else:
                                 weighted_loss_cell = loss_cell
                                 weighted_loss_img = loss_img
 
                             # DEBUG: Print each value and its shape and type
-                            # print(f"weighted_loss_cell: {weighted_loss_cell.shape}")
-                            # print(f"weighted_loss_img: {weighted_loss_img.shape}")
+                            if cfg.basic.debug:
+                                print(f"weighted_loss_cell: {weighted_loss_cell.shape}")
+                                print(f"weighted_loss_img: {weighted_loss_img.shape}")
                             
                             # Calculate mean if needed
                             if not len(weighted_loss_cell.shape) == 0:
@@ -177,11 +185,11 @@ def train(
                             
                             # Calculate total loss
                             loss = cfg.loss.cellweight * weighted_loss_cell + weighted_loss_img
-                            
-                            # DEBUG: Print value
-                            # print(f"loss: {loss}")
-                            
                             losses.append(loss.item())
+
+                            del ipt, lbl, img_lbl, conf_lbl, conf_img_lbl, cnt
+                            del cell, img, loss_cell, loss_img, weighted_loss_cell, weighted_loss_img
+                            gc.collect()
                     else:
                         raise NotImplementedError("cfg.basic.amp is not Native.")
 
@@ -194,8 +202,10 @@ def train(
                 else:
                     loss.backward()
 
+                del loss
+                gc.collect()
+
                 # Optimizer step
-                # print(f"Optimizer step")
                 # print(f"cfg.train.clip: {cfg.train.clip}")
                 if i % cfg.optimizer.step == 0:
                     if cfg.basic.amp == 'Native':
@@ -220,12 +230,36 @@ def train(
                         scheduler.step()
 
                 if not tune:
-                    tq.set_postfix(loss=np.array(losses).mean(), lr=optimizer.param_groups[0]['lr'])
+                    # tq.set_postfix(loss=np.array(losses).mean(), lr=optimizer.param_groups[0]['lr'])
+
+                    # Get CPU and RAM usage
+                    cpu_mem = psutil.virtual_memory()
+                    cpu_mem_used = cpu_mem.used / (1024 ** 3)  # Convert to GB
+                    cpu_mem_free = cpu_mem.available / (1024 ** 3)  # Convert to GB
+
+                    # Get GPU usage
+                    gpu_mem_used = torch.cuda.memory_allocated(0) / (1024 ** 3)
+                    gpu_mem_free = (
+                        torch.cuda.get_device_properties(0).total_memory - torch.cuda.memory_reserved(0)
+                    ) / (1024 ** 3)
+                    
+                    # Update tqdm description
+                    tq.set_description(
+                        f"[Epoch {epoch}] | Loss: {np.array(losses).mean():.4f} | LR: {optimizer.param_groups[0]['lr']:.2e} | "
+                        f"GPU: {gpu_mem_used:.2f}GB / {gpu_mem_free:.2f}GB | "
+                        f"CPU: {cpu_mem_used:.2f}GB / {cpu_mem_free:.2f}GB"
+                    )
+
+                    del cpu_mem, cpu_mem_used, cpu_mem_free, gpu_mem_used, gpu_mem_free
+                    gc.collect()
 
             # Validation
             validate_loss = validate(model, valid_dl, cfg, writer)
             print(('[ √ ] epochs: {}, train loss: {:.4f}, valid loss: {:.4f}').format(
                 epoch, np.array(losses).mean(), validate_loss))
+            
+            del validate_loss
+            gc.collect()
             
             # Write to tensorboard
             writer.add_scalar('train_f{}/loss'.format(cfg.experiment.run_fold), np.mean(losses), epoch)
@@ -280,8 +314,9 @@ def validate(
             ipt, img_lbl = ipt.to(DEVICE), img_lbl.to(DEVICE)
 
             # DEBUG: Print each value and its shape and type
-            # print(f"ipt: {ipt.shape}, {ipt.dtype}")
-            # print(f"img_lbl: {img_lbl.shape}, {img_lbl.dtype}")
+            if cfg.basic.debug:
+                print(f"ipt: {ipt.shape}, {ipt.dtype}")
+                print(f"img_lbl: {img_lbl.shape}, {img_lbl.dtype}")
 
             # Get logits and loss
             if cfg.basic.amp == 'Native':
@@ -296,14 +331,16 @@ def validate(
             else:
                 raise NotImplementedError("cfg.basic.amp is not Native.")
             
+            # Append loss to list
             losses.append(loss.item())
 
             # Predictions
             pred = torch.sigmoid(output.cpu()).numpy()
 
             # DEBUG: Print each value and its shape and type
-            # print(f"predicted: {pred.shape}, {pred.dtype}")
-            # print(f"truth: {img_lbl.shape}, {img_lbl.dtype}")
+            if cfg.basic.debug:
+                print(f"predicted: {pred.shape}, {pred.dtype}")
+                print(f"truth: {img_lbl.shape}, {img_lbl.dtype}")
 
             # Append to lists
             predicted.append(pred)
@@ -320,11 +357,12 @@ def validate(
         val_loss = np.array(losses).mean()
 
         # DEBUG: Print each value and its shape and type
-        # print(f"val_loss: {val_loss}")
-        # print(f"predicted: {predicted}")
-        # print(f"predicted: {predicted.shape}, {predicted.dtype}")
-        # print(f"truth: {truth}")
-        # print(f"truth: {truth.shape}, {truth.dtype}")
+        if cfg.basic.debug:
+            print(f"val_loss: {val_loss}")
+            print(f"predicted: {predicted}")
+            print(f"predicted: {predicted.shape}, {predicted.dtype}")
+            print(f"truth: {truth}")
+            print(f"truth: {truth.shape}, {truth.dtype}")
         
         # Classification report
         predicted_binary = (predicted > 0.5).astype(int)
